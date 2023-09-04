@@ -1,0 +1,104 @@
+{
+  "format": 1,
+  "restore": {
+    "C:\\Users\\ldngu\\source\\repos\\vimecGelcard\\vimecGelcard\\vimecGelcard.csproj": {}
+  },
+  "projects": {
+    "C:\\Users\\ldngu\\source\\repos\\vimecGelcard\\vimecGelcard\\vimecGelcard.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\ldngu\\source\\repos\\vimecGelcard\\vimecGelcard\\vimecGelcard.csproj",
+        "projectName": "vimecGelcard",
+        "projectPath": "C:\\Users\\ldngu\\source\\repos\\vimecGelcard\\vimecGelcard\\vimecGelcard.csproj",
+        "packagesPath": "C:\\Users\\ldngu\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\ldngu\\source\\repos\\vimecGelcard\\vimecGelcard\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\ldngu\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net6.0-windows"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net6.0-windows7.0": {
+            "targetAlias": "net6.0-windows",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "net6.0-windows7.0": {
+          "targetAlias": "net6.0-windows",
+          "dependencies": {
+            "AForge.Video": {
+              "target": "Package",
+              "version": "[2.2.5, )"
+            },
+            "AWSSDK.Core": {
+              "target": "Package",
+              "version": "[3.7.201.4, )"
+            },
+            "AWSSDK.Extensions.NETCore.Setup": {
+              "target": "Package",
+              "version": "[3.7.7, )"
+            },
+            "AWSSDK.IotData": {
+              "target": "Package",
+              "version": "[3.7.200.24, )"
+            },
+            "M2Mqtt": {
+              "target": "Package",
+              "version": "[4.3.0, )"
+            },
+            "MQTTnet": {
+              "target": "Package",
+              "version": "[4.2.1.781, )"
+            },
+            "MQTTnet.Extensions.Rpc": {
+              "target": "Package",
+              "version": "[4.2.1.781, )"
+            },
+            "MQTTnet.Extensions.WebSocket4Net": {
+              "target": "Package",
+              "version": "[4.2.1.781, )"
+            },
+            "MySql.Data": {
+              "target": "Package",
+              "version": "[8.1.0, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            },
+            "Microsoft.WindowsDesktop.App.WindowsForms": {
+              "privateAssets": "none"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\7.0.304\\RuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

@@ -1,23 +1,71 @@
-/*!
-   @file CM60_scanner.h
-   @brief GM65条形识读模块，arduino库
-   @copyright  Copyright (c) 2010 DFRobot Co.Ltd (http://www.dfrobot.com)
-   @licence     The MIT License (MIT)
-   @author [Gangxiao Xue](gangxiao.xue@dfrobot.com)
-   @version  V1.0
-   @date  2020-08-19
-   @https://github.com/xuegangxiao0117/
-*/
-
 #include "GM65_scanner.h"
 
-GM65_scanner::GM65_scanner(Stream * serial) {
+GM65_scanner::GM65_scanner(Stream* serial) {
   mySerial = serial;
 }
 
+bool GM65_scanner::writeCommand(const char* command, size_t len) {
+  mySerial->write(command, len);
+  mySerial->flush();
+  return mySerial->availableForWrite() == 0;
+}
 
-int *GM65_scanner::get_response()
-{
+int GM65_scanner::readResponse(char* buffer, size_t bufferSize) {
+  int bytesRead = 0;
+  while (mySerial->available() && bytesRead < bufferSize) {
+    buffer[bytesRead] = mySerial->read();
+    bytesRead++;
+  }
+  return bytesRead;
+}
+
+void GM65_scanner::waitForResponse(int timeout) {
+  unsigned long startTime = millis();
+  while (millis() - startTime < timeout) {
+    if (mySerial->available()) {
+      break;
+    }
+  }
+}
+
+bool GM65_scanner::isResponseOK(const char* expectedResponse, int timeout) {
+  char buffer[64];
+  int bytesRead = readResponse(buffer, sizeof(buffer));
+  if (bytesRead > 0) {
+    buffer[bytesRead] = '\0';
+    if (strcmp(buffer, expectedResponse) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void GM65_scanner::init() {
+  writeCommand("\x7E\x00\x08\x01\x00\xD9\x55\xAB\xCD", 9); // Set default
+  waitForResponse(10000);
+  writeCommand("\x7E\x00\x08\x01\x00\x0D\x00\xAB\xCD", 9); // Set serial output
+  waitForResponse(1000);
+}
+
+void GM65_scanner::enableSettingCode() {
+  writeCommand("\x7E\x00\x08\x01\x00\x03\x01\xAB\xCD", 9);
+  waitForResponse(1000);
+}
+
+void GM65_scanner::disableSettingCode() {
+  writeCommand("\x7E\x00\x08\x01\x00\x03\x03\xAB\xCD", 9);
+  waitForResponse(1000);
+}
+
+int GM65_scanner::getMode(byte addr1, byte addr2) {
+  byte read_reg[9] = {0x7E, 0x00, 0x07, 0x01, 0x00, 0x00, addr1, addr2, 0xAB};
+  writeCommand(reinterpret_cast<const char*>(read_reg), 9);
+  waitForResponse(1000);
+  int* p = getResponse();
+  return *(p + 4);
+}
+
+int* GM65_scanner::getResponse() {
   static int buf[20];
   int count = 0;
   if (mySerial->available() > 0) {
@@ -27,132 +75,74 @@ int *GM65_scanner::get_response()
     }
     return buf;
   }
+  return nullptr;
 }
 
-void GM65_scanner::clear_buffer()
-{
+void GM65_scanner::clearBuffer() {
   if (mySerial->available()) {
     while (mySerial->available() > 0) {
-      char temp =  mySerial->read();
+      char temp = mySerial->read();
     }
   }
 }
 
-
-void GM65_scanner::init()
-{
-  mySerial->write(set_default, 9);
-  delay(10000);
-  mySerial->write(set_serial_output, 9);
-  delay(1000);
-  //GM65_scanner::get_response();
-  //GM65_scanner::clear_buffer();
+void GM65_scanner::setSilentMode(uint8_t silentMode) {
+  int currentMode = getMode(0x00, 0x00);
+  int temp = ~(1ul << 6) & currentMode;
+  byte modeData = temp + (silentMode << 6);
+  char modeCommand[9] = {0x7E, 0x00, 0x08, 0x01, 0x00, 0x00, modeData, 0xAB, 0xCD};
+  writeCommand(modeCommand, 9);
 }
 
-void GM65_scanner::enable_setting_code()
-{
-  mySerial->write(enable_setttingcode, 9);
-  delay(1000);
-  //GM65_scanner::get_response();
-  ///GM65_scanner::clear_buffer();
+void GM65_scanner::setLEDMode(uint8_t LEDMode) {
+  int currentMode = getMode(0x00, 0x00);
+  int temp = ~(1ul << 7) & currentMode;
+  byte modeData = temp + (LEDMode << 7);
+  char modeCommand[9] = {0x7E, 0x00, 0x08, 0x01, 0x00, 0x00, modeData, 0xAB, 0xCD};
+  writeCommand(modeCommand, 9);
 }
 
-void GM65_scanner::disable_setting_code()
-{
-  mySerial->write(disable_setttingcode, 9);
-  delay(1000);
-  //GM65_scanner::get_response();
-  //GM65_scanner::clear_buffer();
+void GM65_scanner::setWorkingMode(uint8_t workingMode) {
+  int currentMode = getMode(0x00, 0x00);
+  int temp = ~(0b11ul) & currentMode;
+  byte modeData = temp + workingMode;
+  char modeCommand[9] = {0x7E, 0x00, 0x08, 0x01, 0x00, 0x00, modeData, 0xAB, 0xCD};
+  writeCommand(modeCommand, 9);
 }
 
-int GM65_scanner::get_mode(byte addr1, byte addr2)
-{
-  read_reg[4] = addr1;
-  read_reg[5] = addr2;
-  GM65_scanner::clear_buffer();
-  mySerial->write(read_reg, 9);
-  delay(1000);
-  int *p;
-  p = GM65_scanner::get_response();
-  return *(p + 4);
-
+void GM65_scanner::setLightMode(uint8_t lightMode) {
+  int currentMode = getMode(0x00, 0x00);
+  int temp = ~(0b11ul << 2) & currentMode;
+  byte modeData = temp + (lightMode << 2);
+  char modeCommand[9] = {0x7E, 0x00, 0x08, 0x01, 0x00, 0x00, modeData, 0xAB, 0xCD};
+  writeCommand(modeCommand, 9);
 }
 
-void GM65_scanner::set_silent_mode(uint8_t silent_mode)
-{
-  int current_mode = get_mode(0x00, 0x00);
-  int temp = ~(1ul << 6)&current_mode;
-  byte mode_data;
-  mode_data = temp + (silent_mode << 6);
-  char mode_command[9] = {0x7E, 0x00, 0x08, 0x01, 0x00, 0x00, mode_data, 0xAB, 0xCD};
-  mySerial->write(mode_command, 9);
-  //GM65_scanner::get_response();
-  //GM65_scanner::clear_buffer();
+void GM65_scanner::setAimMode(uint8_t aimMode) {
+  int currentMode = getMode(0x00, 0x00);
+  int temp = ~(0b11ul << 4) & currentMode;
+  byte modeData = temp + (aimMode << 4);
+  char modeCommand[9] = {0x7E, 0x00, 0x08, 0x01, 0x00, 0x00, modeData, 0xAB, 0xCD};
+  writeCommand(modeCommand, 9);
 }
 
-void GM65_scanner::set_LED_mode(uint8_t LED_mode)
-{
-  int current_mode = get_mode(0x00, 0x00);
-  int temp = ~(1ul << 7)&current_mode;
-  byte mode_data;
-  mode_data = temp + (LED_mode << 7);
-  char mode_command[9] = {0x7E, 0x00, 0x08, 0x01, 0x00, 0x00, mode_data, 0xAB, 0xCD};
-  mySerial->write(mode_command, 9);
-  //GM65_scanner::get_response();
-  //GM65_scanner::clear_buffer();
+void GM65_scanner::scanOnce() {
+  writeCommand("\x7E\x00\x08\x01\x00\x02\x01\xAB\xCD", 9);
 }
 
-
-void GM65_scanner::set_working_mode(uint8_t working_mode) //bit0-1
-{
-  int current_mode = get_mode(0x00, 0x00);
-  int temp = ~(0b11ul)&current_mode;
-  byte mode_data;
-  mode_data = temp + working_mode;
-  char mode_command[9] = {0x7E, 0x00, 0x08, 0x01, 0x00, 0x00, mode_data, 0xAB, 0xCD};
-  mySerial->write(mode_command, 9);
+void GM65_scanner::setSleepMode(uint8_t sleepMode) {
+  int currentMode = getMode(0x00, 0x07);
+  int temp = ~(0b1ul << 7) & currentMode;
+  byte modeData = temp + (sleepMode << 7);
+  char modeCommand[9] = {0x7E, 0x00, 0x08, 0x01, 0x00, 0x07, modeData, 0xAB, 0xCD};
+  writeCommand(modeCommand, 9);
 }
 
-void GM65_scanner::set_light_mode(uint8_t light_mode) //bit2-3
-{
-  int current_mode = get_mode(0x00, 0x00);
-  int temp = ~(0b11ul << 2)&current_mode;
-  byte mode_data;
-  mode_data = temp + (light_mode << 2);
-  char mode_command[9] = {0x7E, 0x00, 0x08, 0x01, 0x00, 0x00, mode_data, 0xAB, 0xCD};
-  mySerial->write(mode_command, 9);
-}
-
-void GM65_scanner::set_aim_mode(uint8_t aim_mode) //bit4-5
-{
-  int current_mode = get_mode(0x00, 0x00);
-  int temp = ~(0b11ul << 4)&current_mode;
-  byte mode_data;
-  mode_data = temp + (aim_mode << 4);
-  char mode_command[9] = {0x7E, 0x00, 0x08, 0x01, 0x00, 0x00, mode_data, 0xAB, 0xCD};
-  mySerial->write(mode_command, 9);
-}
-
-void GM65_scanner::scan_once()
-{
-    mySerial->write(scan_once_command, 9);
-}
-
-void GM65_scanner::set_sleep_mode(uint8_t sleep_mode){
-  int current_mode = get_mode(0x00, 0x07);
-  int temp = ~(0b1ul << 7)&current_mode;
-  byte mode_data;
-  mode_data = temp + (sleep_mode << 7);
-  char mode_command[9] = {0x7E, 0x00, 0x08, 0x01, 0x00, 0x07, mode_data, 0xAB, 0xCD};
-  mySerial->write(mode_command, 9);
-
-}
-
-String GM65_scanner::get_info(){
+String GM65_scanner::getInfo() {
   String s = "";
   if (mySerial->available() > 0) {
     while (mySerial->available()) {
-      s = s + char(mySerial->read());
+      s += char(mySerial->read());
     }
   }
   return s;

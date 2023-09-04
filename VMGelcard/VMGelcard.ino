@@ -66,16 +66,22 @@ volatile bool isScanning = false;
 
 void startCameraServer();
 void setupLedFlash(int pin);
+void connectWifi();
+void connectMQTT();
+void checkConnections();
+
+GM65_scanner gm65(&QR);
 
 bool check = false;
 
 void IRAM_ATTR buttonInterrupt() {
-  xTaskCreatePinnedToCore(loop2_escucha_escaner_qr, "Task1", 10000, NULL, 3, &Task1, 0);
+  // xTaskCreatePinnedToCore(loop2_escucha_escaner_qr, "Task1", 10000, NULL, 3, &Task1, 0);
 }
 
 void loop2_escucha_escaner_qr(void *pvParameters) {
   for (;;) {
-    if (QR.available() > 0) { 
+
+    if (QR.available() > 0) {
       String barcode = "";
 
       while (QR.available()) {
@@ -104,18 +110,19 @@ void callback(char* topic, byte* payload, unsigned int length){
   
   if (String(topic) == topic_barcode_req && receivedPayload == "barcode") {
     mqttClient.publish(topic_barcode_res, receivedPayload.c_str());
-    
-    GM65_scanner gm65(&QR);
-    gm65.init();
-    gm65.disable_setting_code();
-    gm65.set_working_mode(0);
-    gm65.scan_once();
-    
     xTaskCreatePinnedToCore(loop2_escucha_escaner_qr, "Task1", 10000, NULL, 3, &Task1, 0);
   }
 }
 
 void connectWifi(){
+  // WiFiManager wm;
+  // bool res;
+  // wm.resetSettings();
+  // res = wm.autoConnect("AutoConnectAP","password");
+
+  WiFi.begin(ssid, password);
+  WiFi.setSleep(false);
+  
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -155,7 +162,7 @@ void setup() {
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
-  config.frame_size = FRAMESIZE_UXGA;
+  config.frame_size = FRAMESIZE_VGA;
   config.pixel_format = PIXFORMAT_JPEG; // for streaming
   //config.pixel_format = PIXFORMAT_RGB565; // for face detection/recognition
   config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
@@ -221,14 +228,19 @@ void setup() {
   setupLedFlash(LED_GPIO_NUM);
 #endif
 
-  WiFi.begin(ssid, password);
-  WiFi.setSleep(false);
-  
-  if (!check){
-    connectWifi();
-    check = true;
-  }
- 
+
+  connectWifi();
+
+  connectMQTT();
+
+  //pinMode(BUTTON_PIN, INPUT_PULLUP);
+  //attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonInterrupt, RISING);
+
+  QR.begin(9600, SERIAL_8N1, 1, 3);
+  xTaskCreatePinnedToCore(loop2_escucha_escaner_qr, "Task1", 10000, NULL, 3, &Task1, 0);
+}
+
+void connectMQTT(){
   wifiClient.setCACert(ca_cert);
   mqttClient.setServer(mqtt_broker, mqtt_port);
   mqttClient.setCallback(callback);
@@ -247,48 +259,21 @@ void setup() {
 
   mqttClient.publish(topic_barcode_res, "Hi, I'm ESP32 ^^ - Barcode");
   mqttClient.subscribe(topic_barcode_req);
-
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonInterrupt, FALLING);
-
-  QR.begin(9600, SERIAL_8N1, 1, 3);
 }
 
-unsigned long lastReconnectAttempt = 0;
+void checkConnections() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi connection lost. Reconnecting...");
+    connectWifi();
+  }
 
-void reconnect() {
-  String client_id = "esp32-client-";
-  client_id += String(WiFi.macAddress());
-  if (mqttClient.connect(client_id.c_str(), mqtt_username, mqtt_password)) {
-    Serial.println("Reconnected to MQTT broker");
-    mqttClient.subscribe(topic_barcode_req);
-  } else {
-    Serial.print("Failed to reconnect to MQTT broker, state: ");
-    Serial.println(mqttClient.state());
+  if (!mqttClient.connected()) {
+    Serial.println("MQTT connection lost. Reconnecting...");
+    connectMQTT();
   }
 }
 
 void loop() {
+  checkConnections();
   mqttClient.loop();
-
-  if (!mqttClient.connected()) {
-    unsigned long currentMillis = millis();
-    if (currentMillis - lastReconnectAttempt > 5000) {
-      lastReconnectAttempt = currentMillis;
-      reconnect();
-    }
-  }
-
-  if (isScanning) {
-    GM65_scanner gm65(&QR); 
-    gm65.init();
-    gm65.set_working_mode(0);
-    while (barcode = "") {
-      gm65.scan_once();
-      String barcode = gm65.get_info();
-    }
-    mqttClient.publish(topic_barcode_res, barcode.c_str());
-    String ipAddress = WiFi.localIP().toString();
-    mqttClient.publish(topic_wifi, ipAddress.c_str());
-  }
 }
